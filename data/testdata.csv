@@ -1,0 +1,2 @@
+﻿Item,Maintenance Level,Vendor,Model,Serial No#,Host Name,IP Address,Purchase Cost,Maintenance Cost (per year),Warranty Start Date,Warranty End Date,cpe_os,cpe_firmware,cpe_software
+1,Medium,Cisco,ASA 5506-X,SN-CIS-0001,cisco-001,10.0.0.1,15000.5,1208,1/1/2022,1/1/2025,cpe:2.3:o:cisco:adaptive_security_appliance_software:9.8.0:*:*:*:*:*:*:*,cpe:2.3:o:cisco:adaptive_security_appliance_software:9.18.1.3:*:*:*:*:*:*:*,cpe:2.3:a:cisco:secure_client:5.0.03072:*:*:*:*:*:*:*
