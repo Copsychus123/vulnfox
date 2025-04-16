@@ -26,7 +26,7 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 - **零信任架構整合 (In the future)**<br>
   系統整合主動掃描、被動監控、配置檔分析與人工分析等多種資產發現機制，從資產管理的角度全面掌握資安隱患，確保實現持續且完整的資產與漏洞監控。
   
-![photo](https://github.com/Copsychus123/vulnfox/blob/main/Asset%20Risk-based%20Zero%20Trust%20Strategy.png)
+![photo](https://github.com/Copsychus123/vulnfox/blob/main/asset%20risk%20management.png)
 <br><br>
 
 ## Demo Video
