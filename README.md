@@ -5,26 +5,26 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 
 ## System Advantages
 
-- **基於資產風險管理**  
-  本系統進行企業資產、潛在威脅與漏洞的系統性檢查，識別、評估及量化風險矩陣，同時記錄詳盡的弱點資訊，支持精準修補與標準化流程，降低整體資安風險。
+- **Asset-Based Risk Management**  
+   The system performs a systematic review of corporate assets, potential threats, and vulnerabilities. It identifies, assesses, and quantifies the risk matrix while documenting detailed vulnerability information. This supports precise remediation and standardized workflows, thereby reducing overall cybersecurity risk.
 
-- **多因子漏洞演算法評估**  
-  除了傳統的 CVSS 評分機制外，系統整合 EPSS 及 KEV 等機制評估漏洞的實際利用風險，使得風險排序更精準，從而聚焦資源於最關鍵的威脅上。
-  
-- **AI 分析與漏洞排序**  
-  結合 AI 分析、風險矩陣方法論，幫助管理者迅速鎖定最需即時處理的關鍵漏洞，聚焦修補資源分配，並規劃具體修補策略與計畫，確保排序更準確，修補更精確。
+- **Multi-Factor Vulnerability Algorithm Assessment**  
+   In addition to the traditional CVSS scoring mechanism, the system integrates mechanisms such as EPSS and KEV to evaluate the actual exploitation risk of vulnerabilities. This results in more accurate risk prioritization, enabling a focus on the most critical threats.
 
-- **修補進度追蹤與效能評估**  
-  系統不僅提供修補建議與排程，還能持續記錄並追蹤修補狀態，協助企業評估修補效能，及時調整資安策略，確保整體防護效果。
+- **AI Analysis and Vulnerability Ranking**  
+   By combining AI analysis with a risk matrix methodology, the system helps managers quickly pinpoint the key vulnerabilities that require immediate attention. This allows for the focused allocation of remediation resources and the planning of specific remediation strategies and schedules, ensuring more precise prioritization and resolution.
 
-- **增強決策的可靠性與透明度**  
-  透過可信任AI機制，系統採用 LLM as a Judge 來進行漏洞風險評估、提供修補建議及制定排程時，能夠確保整個過程具有充分的透明性和可追查性。
+- **Patch Progress Tracking and Performance Evaluation**  
+   The system not only provides patching recommendations and scheduling but also continuously records and tracks the status of patching. This assists enterprises in evaluating the effectiveness of their remediation efforts and in making timely adjustments to their cybersecurity strategy, ensuring the overall protection efficacy.
 
-- **整合式弱點管理流程**  
-  從資產盤點、漏洞資訊收集、AI 分析、漏洞排序，到修補方案制定與進度追蹤，本系統提供一套更完整、系統化的弱點管理解決方案，協助企業更有效應對資安威脅，同時節省修補資源並促進團隊間的協同作業。
+- **Enhanced Decision Reliability and Transparency**  
+   Through the use of trusted AI mechanisms, the system employs “LLM as a Judge” to conduct vulnerability risk assessments, provide remediation recommendations, and set schedules. This ensures the entire process is highly transparent and traceable.
 
-- **零信任架構整合 (In the future)**<br>
-  系統整合主動掃描、被動監控、配置檔分析與人工分析等多種資產發現機制，從資產管理的角度全面掌握資安隱患，確保實現持續且完整的資產與漏洞監控。
+- **Integrated Vulnerability Management Process**  
+   From asset inventory and vulnerability information collection to AI analysis, vulnerability ranking, remediation planning, and progress tracking, the system offers a more comprehensive and systematic vulnerability management solution. This helps enterprises respond more effectively to cybersecurity threats, save remediation resources, and promote team collaboration.
+
+- **Zero Trust Architecture Integration (In the future)**  
+   The system will integrate multiple asset discovery mechanisms such as active scanning, passive monitoring, configuration analysis, and manual analysis to provide a comprehensive oversight of cybersecurity vulnerabilities from an asset management perspective, ensuring continuous and complete asset and vulnerability monitoring.
   
 ![photo](https://github.com/Copsychus123/vulnfox/blob/main/asset%20risk%20management.png)
 <br><br>
@@ -72,21 +72,21 @@ mongorestore --host 127.0.0.1 --port 27017 --db nvd_db nvd_db
 <br>
 
 
-## 競品比較
+## Competitor Analysis
 
-| 項目 |  [AIShield](https://www.aishield.com.tw/) | [Vicarius vRx](https://www.cyberview.com.tw/vicarius/) | [VulnFox](https://github.com/Copsychus123/vulnfox/tree/main) |
+| Item |  [AIShield](https://www.aishield.com.tw/) | [Vicarius vRx](https://www.cyberview.com.tw/vicarius/) | [VulnFox](https://github.com/Copsychus123/vulnfox/tree/main) |
 | --- | :---: | :---: | :---: |
-| 是否需要代理(Agent)  | ✘ | ✘ | ✘ |
-| 資產盤點  | ✅  | ✘ | ✅ |
-| 弱點管理  | ✅  | ✅ | ✅ |
-| AI 修補建議  | ✅  | ✅ | ✅ |
-| AI 修補排程  | ✘ | ✅ | ✅ |
-| AI 後果評鑑  | ✘ | ✘ | ✅ |
-| 風險矩陣分析  | ✘ | ✘ | ✅ |
-| 修補追蹤與紀錄  | ✘ | ✘ | ✅ |
-| 腳本自動化修補 | ✘  | ✅ | ✘ |
-| 風險優先級  | CVSS  | &nbsp;&nbsp;&nbsp;CVSS&nbsp;&nbsp;&nbsp; | CVSS、EPSS、KEV |
-| 適用情境 |IT / SOC / MDR | IT | IT / OT |
+| no Agent  | ✘ | ✘ | ✘ |
+| Asset Inventory  | ✅  | ✘ | ✅ |
+| Vulnerability Management  | ✅  | ✅ | ✅ |
+| AI Remediation Recommendation  | ✅  | ✅ | ✅ |
+| AI Remediation Scheduling  | ✘ | ✅ | ✅ |
+| AI Aftermath Assessment  | ✘ | ✘ | ✅ |
+| Risk Matrix   | ✘ | ✘ | ✅ |
+| Patch Tracking and Logging  | ✘ | ✘ | ✅ |
+| Scripted Automated Patching | ✘  | ✅ | ✘ |
+| Sources  | CVSS  | &nbsp;&nbsp;&nbsp;CVSS&nbsp;&nbsp;&nbsp; | CVSS、EPSS、KEV |
+| Applicable Scenarios |IT / SOC / MDR | IT | IT / OT |
 
 <br>
 
