@@ -10,31 +10,25 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+
 import os, io, logging, pandas as pd
 from typing import Dict, List, Any, Optional, Callable
 from abc import ABC, abstractmethod
 import streamlit as st
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-###############################################################################
-# Model 部分：CSV 資產載入器定義
-###############################################################################
 class BaseDataLoader(ABC):
     """資料載入器的基礎抽象類別"""
-
     @abstractmethod
     def load(self, data_source: Any) -> Dict[str, Any]:
         """載入資料的抽象方法"""
         pass
-
     @abstractmethod
     def validate(self, data: Dict[str, Any]) -> bool:
         """驗證資料的抽象方法"""
         pass
-
     @abstractmethod
     def transform(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """轉換資料的抽象方法"""
@@ -42,12 +36,9 @@ class BaseDataLoader(ABC):
 
 class CSVAssetLoader(BaseDataLoader):
     """CSV 資產載入器實作"""
-
     def __init__(self, required_fields: List[str] = None, transform_func: Optional[Callable] = None):
-        # 只要求 CSV 至少包含這五個必要欄位
         self.required_fields = required_fields or ["Host Name", "IP Address", "cpe_os", "cpe_firmware", "cpe_software"]
         self.transform_func = transform_func
-
     def load(self, file_obj: Any) -> Dict[str, Any]:
         """從文件對象或本地路徑載入 CSV 資料"""
         try:
@@ -61,12 +52,10 @@ class CSVAssetLoader(BaseDataLoader):
                 df = pd.read_csv(file_obj)
             else:
                 df = pd.read_csv(file_obj, encoding='utf-8')
-
             df.columns = [col.strip() for col in df.columns]
             missing_fields = [field for field in self.required_fields if field not in df.columns]
             if missing_fields:
                 raise ValueError(f"CSV 缺少必要欄位: {', '.join(missing_fields)}")
-
             records = df.to_dict(orient="records")
             result = {"assets": records, "source_type": "csv", "total_count": len(records)}
             if self.validate(result):
@@ -77,7 +66,6 @@ class CSVAssetLoader(BaseDataLoader):
             logger.error(f"CSV 載入錯誤: {e}")
             st.error(f"讀取 CSV 檔案時發生錯誤：{e}")
             raise
-
     def validate(self, data: Dict[str, Any]) -> bool:
         """僅檢查必要欄位是否存在（值可為空）"""
         if not data or "assets" not in data or not data["assets"]:
@@ -88,7 +76,6 @@ class CSVAssetLoader(BaseDataLoader):
                 logger.error(f"驗證失敗：資產記錄缺少必要欄位，資產資料：{asset}")
                 return False
         return True
-
     def transform(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """轉換資料格式，其他欄位缺失時以空字串補齊"""
         if self.transform_func:
@@ -125,12 +112,8 @@ class CSVAssetLoader(BaseDataLoader):
             transformed_assets.append(asset)
         return {"assets": transformed_assets, "total_count": len(transformed_assets)}
 
-###############################################################################
-# 上傳與 MVC 切換：使用 st.empty() 進行內容替換
-###############################################################################
 def load_app():
-    container = st.empty()  # 建立一個佔位容器
-    # 檢查是否已有上傳資料
+    container = st.empty()
     if "imported_assets" not in st.session_state:
         with container.container():
             st.title("請先上傳 CSV 資產清單")
@@ -141,18 +124,14 @@ def load_app():
                     loader = CSVAssetLoader()
                     result = loader.load(uploaded_file)
                     st.session_state["imported_assets"] = result
-
-                    # 新增：呼叫後端 API，將資產寫入資料庫
                     from core.model import DataModel
                     api_response = DataModel.api_request(
                         endpoint="upload_assets",
                         method="POST",
                         data={"assets": result["assets"]}
                     )
-
                     if api_response and api_response.get("status") == "success":
                         st.success(api_response.get("message", "成功上傳資產至後端"))
-                        # 成功上傳後，清空容器，再自動載入 MVC 主流程
                         container.empty()
                         mvc_view(container)
                     else:
@@ -164,17 +143,13 @@ def load_app():
     else:
         mvc_view(container)
 
-
 def mvc_view(container):
     with container.container():
         st.title("企業漏洞風險管理系統")
-
         from core.controller import AppController
-
         controller = AppController()
         controller.handle_tab_click()
         controller.render_sidebar()
-
         tabs = st.tabs(["系統概覽", "資產管理", "弱點管理", "風險降低", "風險接受"])
         with tabs[0]:
             controller.show_overview()
@@ -186,16 +161,10 @@ def mvc_view(container):
             controller.show_risk_reduction()
         with tabs[4]:
             controller.show_risk_acceptance()
-
         if st.session_state.get("current_tab", 0) > 0:
-
             from core.view import UIView
-
             UIView.render_tab_navigation(st.session_state["current_tab"])
 
-###############################################################################
-# 主程式：根據 session_state 載入上傳或 MVC 視圖
-###############################################################################
 def main():
     st.set_page_config(
         page_title="企業漏洞風險管理系統",
@@ -208,7 +177,6 @@ def main():
         UIView.load_css()
     except Exception as e:
         logger.warning(f"無法載入 CSS: {e}")
-
     load_app()
 
 if __name__ == "__main__":

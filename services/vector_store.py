@@ -10,6 +10,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+
 import os
 import json
 import logging
@@ -29,22 +30,14 @@ from typing import Dict, List, Optional, Any
 from transformers import AutoTokenizer, AutoModel
 from concurrent.futures import ThreadPoolExecutor
 
-# 載入環境變數與設定日誌
 load_dotenv()
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ------------------------------
-# 初始化模式與資源配置
-# ------------------------------
-
 class InitMode(Enum):
-    INITIALIZE = "initialize"    # 全量初始化
-    LAZY = "lazy"                # 延遲初始化
-    INCREMENTAL = "incremental"  # 增量更新
+    INITIALIZE = "initialize"
+    LAZY = "lazy"
+    INCREMENTAL = "incremental"
 
 class ResourceConfig:
     BATCH_SIZE = 100
@@ -52,160 +45,98 @@ class ResourceConfig:
     SIMILARITY_THRESHOLD = 0.7
     RETENTION_DAYS = 365
     MAX_RETRIES = 3
-    RETRY_DELAY = 1.0       # 重試間隔（秒）
-    LLM_TIMEOUT = 30        # LLM 呼叫超時秒數
-    CACHE_SIZE = 10000      # 快取大小
-    # 定義集合名稱（僅保留文檔集合）
-    COLLECTIONS = {
-        "vulnerabilities": {"collection": "vulnerabilities"},
-        "kev": {"collection": "kev"},
-        "epss": {"collection": "epss"},
-        "rss_clear": {"collection": "rss_clear"},
-        "cpe": {"collection": "cpe"}
-    }
-
-# ------------------------------
-# LRU 快取實作
-# ------------------------------
+    RETRY_DELAY = 1.0
+    LLM_TIMEOUT = 30
+    CACHE_SIZE = 10000
+    COLLECTIONS = {"vulnerabilities": {"collection": "vulnerabilities"}, "kev": {"collection": "kev"}, "epss": {"collection": "epss"}, "rss_clear": {"collection": "rss_clear"}, "cpe": {"collection": "cpe"}}
 
 class LRUCache:
-    """簡單的 LRU 快取實作"""
     def __init__(self, maxsize: int = 1000):
         self.cache = {}
         self.maxsize = maxsize
         self.order = []
-        
     def __getitem__(self, key):
         if key in self.cache:
             self.order.remove(key)
             self.order.append(key)
             return self.cache[key]
         raise KeyError(key)
-        
     def __setitem__(self, key, value):
         if len(self.cache) >= self.maxsize:
             oldest = self.order.pop(0)
             del self.cache[oldest]
         self.cache[key] = value
         self.order.append(key)
-        
     def __contains__(self, key):
         return key in self.cache
 
-# ------------------------------
-# VectorStore 類別：向量存儲與數據處理
-# ------------------------------
-
 class VectorStore:
-    def __init__(self, 
-                data_path: str = r"C:\Users\OTTO\Desktop\TANET 2024\Proposal\src\data\data_lake\chroma_db",
-                init_mode: Optional[str] = None,
-                checkpoint_file: str = "checkpoint.json"):
+    def __init__(self, data_path: str = r"C:\Users\OTTO\Desktop\TANET 2024\Proposal\src\data\data_lake\chroma_db", init_mode: Optional[str] = None, checkpoint_file: str = "checkpoint.json"):
         try:
-            # 1. 基本路徑設置
             self.data_path = Path(data_path)
             self.checkpoint_file = self.data_path / checkpoint_file
-            
-            # 2. 檢查並創建必要的目錄
             os.makedirs(self.data_path, exist_ok=True)
             os.makedirs(self.data_path / "model_cache", exist_ok=True)
-            
-            # 3. 設置初始化模式
             if init_mode is None:
                 init_mode = InitMode.INCREMENTAL.value
             self.init_mode = init_mode
             logger.info(f"向量存儲初始化模式：{init_mode}")
-            
-            # 4. 初始化 ChromaDB 客戶端
             try:
-                self.chroma_client = chromadb.PersistentClient(
-                    path=str(self.data_path)
-                )
+                self.chroma_client = chromadb.PersistentClient(path=str(self.data_path))
                 logger.info("ChromaDB 客戶端初始化成功")
             except Exception as e:
                 logger.error(f"ChromaDB 客戶端初始化失敗：{e}")
                 self.chroma_client = None
                 raise
-            
-            # 5. 檢查現有集合
             existing_collections = self.chroma_client.list_collections()
             logger.info(f"發現現有集合: {existing_collections}")
-            
-            # 6. 初始化集合字典和命名映射
             self.collections = {}
             self.collection_naming = {}
-            
-            # 7. 載入現有集合
             for collection_name in existing_collections:
                 try:
-                    # 直接使用原始集合名稱，不添加後綴
                     self.collections[collection_name] = self.chroma_client.get_collection(name=collection_name)
-                    # 建立集合名稱映射，保持原始名稱
                     self.collection_naming[collection_name] = collection_name
                     logger.info(f"載入現有集合: {collection_name}")
                 except Exception as e:
                     logger.error(f"載入集合 {collection_name} 失敗: {e}")
-            
-            # 8. 初始化其他組件
             self.mongo_client = MongoClient(os.getenv('MONGODB_URI'))
             self.db = self.mongo_client[os.getenv('NVD_DB', 'nvd_db')]
             self.executor = ThreadPoolExecutor(max_workers=(os.cpu_count() or 4))
-            
-            # 9. 初始化快取與狀態
             self.processed_ids = self._load_checkpoint()
             self.vector_cache = LRUCache(maxsize=ResourceConfig.CACHE_SIZE)
             self.document_cache = LRUCache(maxsize=ResourceConfig.CACHE_SIZE // 2)
             self.checkpoint_buffer = {}
-            
-            # 10. 初始化同步鎖與信號量
             self.checkpoint_lock = asyncio.Lock()
             self.doc_process_semaphore = asyncio.Semaphore(8)
-            
-            # 11. 懶初始化 loop 與 embedding_model
             self.loop = None
             self.embedding_model = None
-            
-            # 12. 初始化隊列與工作任務（向量生成與批次上傳）
             self.embedding_queue = asyncio.Queue()
             self.upsert_queue = asyncio.Queue()
-            # 不在構造函數中創建任務，而是在async initialize中創建
             self.embedding_worker_task = None
             self.upsert_worker_task = None
-            
             logger.info(f"向量存儲系統初始化完成：{self.data_path}")
-            
         except Exception as e:
             logger.error(f"向量存儲系統初始化失敗：{e}", exc_info=True)
             self.chroma_client = None
             raise
-
     async def initialize(self):
-        """異步初始化方法，啟動背景任務"""
         try:
-            # 獲取或創建事件循環
             if self.loop is None:
                 try:
                     self.loop = asyncio.get_running_loop()
                 except RuntimeError:
                     self.loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(self.loop)
-            
-            # 現在我們有了事件循環，創建工作任務
             self.embedding_worker_task = asyncio.create_task(self._embedding_worker())
             self.upsert_worker_task = asyncio.create_task(self._upsert_worker())
-            
             logger.info("向量存儲系統工作線程已啟動")
             return True
         except Exception as e:
             logger.error(f"向量存儲系統異步初始化失敗：{e}", exc_info=True)
             return False
-        
     def lazy_initialize_collection(self, key: str):
-        """懶初始化指定集合，若存在則讀取，否則創建"""
         if not self.chroma_client:
-            self.chroma_client = chromadb.PersistentClient(
-                path=str(self.data_path)
-            )
+            self.chroma_client = chromadb.PersistentClient(path=str(self.data_path))
         existing = set(self.chroma_client.list_collections())
         if key in existing:
             docs_name = key
@@ -214,14 +145,8 @@ class VectorStore:
             docs_name = f"{key}_docs"
             logger.info(f"Lazy: 創建新文檔集合: {docs_name}")
         if docs_name not in self.collections:
-            self.collections[docs_name] = (self.chroma_client.get_collection(name=docs_name)
-                                             if docs_name in existing
-                                             else self.chroma_client.create_collection(
-                                                    name=docs_name,
-                                                    metadata={"type": "documents"}
-                                                ))
+            self.collections[docs_name] = (self.chroma_client.get_collection(name=docs_name) if docs_name in existing else self.chroma_client.create_collection(name=docs_name, metadata={"type": "documents"}))
         self.collection_naming[key] = docs_name
-
     def _load_checkpoint(self) -> Dict[str, str]:
         try:
             if self.checkpoint_file.exists():
@@ -229,9 +154,8 @@ class VectorStore:
                     return json.load(f)
             return {}
         except Exception as e:
-            logger.error(f"錯誤：讀取斷點文件失敗：{e}。請確認文件路徑與讀取權限。", exc_info=True)
+            logger.error(f"錯誤：讀取斷點文件失敗：{e}", exc_info=True)
             return {}
-
     async def _flush_checkpoint(self):
         async with self.checkpoint_lock:
             if self.checkpoint_buffer:
@@ -242,8 +166,7 @@ class VectorStore:
                     logger.info(f"已刷新 {len(self.checkpoint_buffer)} 條斷點記錄")
                     self.checkpoint_buffer.clear()
                 except Exception as e:
-                    logger.error(f"錯誤：刷新斷點記錄失敗：{e}。請檢查文件系統狀態。", exc_info=True)
-
+                    logger.error(f"錯誤：刷新斷點記錄失敗：{e}", exc_info=True)
     async def _periodic_flush_checkpoint(self, interval: int = 10):
         try:
             while True:
@@ -252,21 +175,14 @@ class VectorStore:
         except asyncio.CancelledError:
             logger.info("定期刷新斷點任務已取消")
             raise
-
     def get_new_documents(self) -> List[Dict]:
-        """
-        從 enriched_view 中獲取新文檔（enriched_view 已聚合關聯資料）。
-        只取近三年內的文檔，其他文檔則忽略（由 published 或 last_modified 判斷）。
-        注意：由於 enriched_view 是只讀視圖，更新索引狀態仍在原 vulnerabilities 集合中進行。
-        """
         try:
             all_docs = list(self.db["enriched_view"].find({}))
             new_docs = []
-            three_years_ago = datetime.now(timezone.utc) - timedelta(days=1*365)
+            three_years_ago = datetime.now(timezone.utc) - timedelta(days=365)
             for doc in all_docs:
                 processed_ts = self.processed_ids.get(str(doc.get("_id")))
                 doc_ts = doc.get("last_modified") or doc.get("published")
-                # 嘗試解析日期（假設為 ISO 格式字符串或 datetime 物件）
                 if doc_ts:
                     if isinstance(doc_ts, str):
                         try:
@@ -277,26 +193,20 @@ class VectorStore:
                         dt = doc_ts
                     else:
                         dt = None
-                    # 若日期解析成功且早於三年前，則跳過
                     if dt and dt < three_years_ago:
                         continue
                 if (processed_ts is None) or (doc_ts and doc_ts > processed_ts):
                     new_docs.append(doc)
             return new_docs
         except Exception as e:
-            logger.error(f"錯誤：在獲取新文檔過程中發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：在獲取新文檔過程中發生異常：{e}", exc_info=True)
             return []
-
     def mark_documents_as_indexed(self, docs: List[Dict]) -> None:
         try:
             doc_ids = [doc["_id"] for doc in docs if "_id" in doc]
-            self.db["vulnerabilities"].update_many(
-                {"_id": {"$in": doc_ids}},
-                {"$set": {"indexed": True}}
-            )
+            self.db["vulnerabilities"].update_many({"_id": {"$in": doc_ids}}, {"$set": {"indexed": True}})
         except Exception as e:
-            logger.error(f"錯誤：更新文檔索引狀態失敗：{e}。", exc_info=True)
-
+            logger.error(f"錯誤：更新文檔索引狀態失敗：{e}", exc_info=True)
     async def poll_for_updates(self, interval: int = 604800):
         while True:
             try:
@@ -316,7 +226,7 @@ class VectorStore:
                 else:
                     logger.info("暫無新文檔需要更新")
             except Exception as e:
-                logger.error(f"錯誤：在增量更新過程中發生異常：{e}。", exc_info=True)
+                logger.error(f"錯誤：在增量更新過程中發生異常：{e}", exc_info=True)
             await asyncio.sleep(interval)
 
     def _init_embedding_model(self):
@@ -324,18 +234,12 @@ class VectorStore:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             logger.info(f"使用設備: {device}")
             logger.info("開始載入 tokenizer...")
-            tokenizer = AutoTokenizer.from_pretrained(
-                "intfloat/multilingual-e5-large",
-                cache_dir=str(self.data_path / "model_cache")
-            )
+            tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-large", cache_dir=str(self.data_path / "model_cache"))
             if not tokenizer:
                 raise ValueError("Tokenizer 載入失敗")
             logger.info("Tokenizer 載入完成")
             logger.info("開始載入模型...")
-            model = AutoModel.from_pretrained(
-                "intfloat/multilingual-e5-large",
-                cache_dir=str(self.data_path / "model_cache")
-            )
+            model = AutoModel.from_pretrained("intfloat/multilingual-e5-large", cache_dir=str(self.data_path / "model_cache"))
             if not model:
                 raise ValueError("模型載入失敗")
             model = model.to(device)
@@ -343,9 +247,8 @@ class VectorStore:
             logger.info("模型載入完成")
             return {"device": device, "tokenizer": tokenizer, "model": model}
         except Exception as e:
-            logger.error(f"錯誤：初始化嵌入模型失敗：{e}。請確認模型配置與依賴是否正確。", exc_info=True)
+            logger.error(f"錯誤：初始化嵌入模型失敗：{e}", exc_info=True)
             return None
-
     @lru_cache(maxsize=1000)
     def _generate_embedding(self, text: str) -> Optional[List[float]]:
         if not self.embedding_model:
@@ -374,9 +277,8 @@ class VectorStore:
                     return None
                 return embedding.cpu().numpy()[0].tolist()
         except Exception as e:
-            logger.error(f"錯誤：向量生成失敗：{e}。", exc_info=True)
+            logger.error(f"錯誤：向量生成失敗：{e}", exc_info=True)
             return None
-
     def _generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
         if not self.embedding_model:
             logger.error("錯誤：嵌入模型尚未初始化，無法生成批次向量。請先初始化模型。")
@@ -397,11 +299,9 @@ class VectorStore:
                     return [None] * len(texts)
             return embeddings_list
         except Exception as e:
-            logger.error(f"錯誤：批次向量生成失敗：{e}。", exc_info=True)
+            logger.error(f"錯誤：批次向量生成失敗：{e}", exc_info=True)
             return [None] * len(texts)
-
     async def generate_embedding_async(self, text: str) -> Optional[List[float]]:
-        """將文本提交至批次向量生成隊列，等待批次生成結果"""
         if self.loop is None:
             try:
                 self.loop = asyncio.get_running_loop()
@@ -410,9 +310,7 @@ class VectorStore:
         fut = self.loop.create_future()
         await self.embedding_queue.put((text, fut))
         return await fut
-
     async def query(self, text: str, collection_name: str = None, top_k: int = 5, threshold: float = 0.7, use_cache: bool = True) -> Dict:
-        # 懶初始化 loop 與 embedding_model（如果尚未初始化）
         if self.loop is None:
             try:
                 self.loop = asyncio.get_running_loop()
@@ -450,15 +348,14 @@ class VectorStore:
                             self.vector_cache[cache_key] = batch_results
                         results['results'].extend(batch_results)
                 except Exception as e:
-                    logger.error(f"錯誤：在查詢集合 '{key}' 時發生異常：{e}。", exc_info=True)
+                    logger.error(f"錯誤：在查詢集合 '{key}' 時發生異常：{e}", exc_info=True)
                     continue
             results['results'].sort(key=lambda x: x.get('final_score', x.get('score', 0)), reverse=True)
             results['results'] = results['results'][:top_k]
             return results
         except Exception as e:
-            logger.error(f"錯誤：查詢過程中發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：查詢過程中發生異常：{e}", exc_info=True)
             return {'query': text, 'timestamp': datetime.now(timezone.utc).isoformat(), 'results': []}
-
     async def _process_batch_results(self, batch_results: Dict, key: str, threshold: float, query_embedding: List[float]) -> List[Dict]:
         processed_results = []
         try:
@@ -471,43 +368,31 @@ class VectorStore:
                         continue
                     mapping_prefix = "" if self.collection_naming.get(key) == key else f"{key}_"
                     raw_doc_id = doc_id[len(mapping_prefix):] if doc_id.startswith(mapping_prefix) else doc_id
-                    result = {
-                        'id': doc_id,
-                        'raw_doc_id': raw_doc_id,
-                        'document': json.loads(batch_results['documents'][0][i]),
-                        'doc_score': doc_dist,
-                        'metadata': batch_results['metadatas'][0][i],
-                        'score': doc_dist
-                    }
+                    result = {'id': doc_id, 'raw_doc_id': raw_doc_id, 'document': json.loads(batch_results['documents'][0][i]), 'doc_score': doc_dist, 'metadata': batch_results['metadatas'][0][i], 'score': doc_dist}
                     self.document_cache[doc_id] = result
                     processed_results.append(result)
                 except Exception as e:
-                    logger.error(f"錯誤：在處理文檔 (doc_id: {doc_id}) 結果時發生異常：{e}。", exc_info=True)
+                    logger.error(f"錯誤：在處理文檔 (doc_id: {doc_id}) 結果時發生異常：{e}", exc_info=True)
                     continue
             return processed_results
         except Exception as e:
-            logger.error(f"錯誤：批次處理結果時發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：批次處理結果時發生異常：{e}", exc_info=True)
             return []
-
     async def _batch_query(self, key: str, query_embedding: List[float], top_k: int, threshold: float) -> List[Dict]:
         try:
-            # 使用原始集合名稱，不添加後綴
             collection = self.collections.get("all")
             if not collection:
                 logger.error("錯誤：未找到集合：all")
                 return []
-                
             batch_results = collection.query(query_embeddings=[query_embedding], n_results=top_k)
             if not batch_results['ids'][0]:
                 logger.info(f"集合 {key} 未返回查詢結果")
                 return []
-                
             batch_processed = await self._process_batch_results(batch_results, key, threshold, query_embedding)
             return batch_processed
         except Exception as e:
             logger.error(f"錯誤：執行批次查詢操作時發生異常：{e}", exc_info=True)
             return []
-    
     def _handle_mongo_doc(self, doc: Dict) -> Dict:
         if not doc:
             logger.warning("警告：收到空的文檔，跳過處理。")
@@ -525,9 +410,8 @@ class VectorStore:
         try:
             return {k: convert_value(v) for k, v in doc.items()}
         except Exception as e:
-            logger.error(f"錯誤：在處理 MongoDB 文檔 (ID: {doc.get('_id', '未知')}) 時發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：在處理 MongoDB 文檔 (ID: {doc.get('_id', '未知')}) 時發生異常：{e}", exc_info=True)
             return {}
-
     async def _handle_mongo_doc_async(self, doc: Dict) -> Dict:
         try:
             if not doc:
@@ -536,16 +420,14 @@ class VectorStore:
                 return self._handle_mongo_doc(doc)
             return await self.loop.run_in_executor(self.executor, convert)
         except Exception as e:
-            logger.error(f"錯誤：在異步處理 MongoDB 文檔時發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：在異步處理 MongoDB 文檔時發生異常：{e}", exc_info=True)
             return {}
-
     def _convert_to_json(self, doc: Dict) -> str:
         try:
             return json.dumps(self._handle_mongo_doc(doc), ensure_ascii=False)
         except Exception as e:
-            logger.error(f"錯誤：文檔轉換為 JSON 格式失敗：{e}。", exc_info=True)
+            logger.error(f"錯誤：文檔轉換為 JSON 格式失敗：{e}", exc_info=True)
             return ""
-
     async def process_document(self, doc: Dict, key: str) -> bool:
         async with self.doc_process_semaphore:
             try:
@@ -557,24 +439,20 @@ class VectorStore:
                 elif not docs_collection_name:
                     logger.error(f"錯誤：集合 '{key}' 尚未初始化，請確認初始化過程是否正確。")
                     return False
-
                 processed_doc = self._handle_mongo_doc(doc)
                 if not processed_doc:
                     logger.error("錯誤：文檔處理失敗，無法進行後續處理，跳過此文檔。")
                     return False
-
                 raw_doc_id = str(processed_doc.get('_id', ''))
                 if not raw_doc_id:
                     logger.error("錯誤：文檔缺少唯一識別碼 (ID)，無法進行處理。")
                     return False
-
                 storage_doc_id = raw_doc_id if self.collection_naming.get(key) == key else f"{key}_{raw_doc_id}"
                 last_modified = processed_doc.get('last_modified', processed_doc.get('published'))
                 if self.init_mode == InitMode.INCREMENTAL.value:
                     if storage_doc_id in self.processed_ids and self.processed_ids[storage_doc_id] == last_modified:
                         logger.info(f"文檔 {storage_doc_id} 未更新，跳過處理")
                         return True
-
                 try:
                     doc_text = self._convert_to_json(processed_doc)
                     if not doc_text:
@@ -585,24 +463,11 @@ class VectorStore:
                         logger.error("錯誤：生成文檔向量失敗。")
                         return False
                 except Exception as e:
-                    logger.error(f"錯誤：向量生成失敗：{e}。", exc_info=True)
+                    logger.error(f"錯誤：向量生成失敗：{e}", exc_info=True)
                     return False
-
                 try:
                     fut = self.loop.create_future()
-                    upsert_job = (
-                        self.collection_naming.get(key),
-                        storage_doc_id,
-                        doc_embedding,
-                        doc_text,
-                        {
-                            "type": "document",
-                            "source": key,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "doc_id": raw_doc_id
-                        },
-                        fut
-                    )
+                    upsert_job = (self.collection_naming.get(key), storage_doc_id, doc_embedding, doc_text, {"type": "document", "source": key, "timestamp": datetime.now(timezone.utc).isoformat(), "doc_id": raw_doc_id}, fut)
                     await self.upsert_queue.put(upsert_job)
                     upsert_result = await fut
                     if not upsert_result:
@@ -616,16 +481,14 @@ class VectorStore:
                         return False
                     return True
                 except Exception as e:
-                    logger.error(f"錯誤：向量存儲更新失敗：{e}。", exc_info=True)
+                    logger.error(f"錯誤：向量存儲更新失敗：{e}", exc_info=True)
                     return False
             except Exception as e:
-                logger.error(f"錯誤：處理文檔時發生異常：{e}。", exc_info=True)
+                logger.error(f"錯誤：處理文檔時發生異常：{e}", exc_info=True)
                 return False
-
     def _update_checkpoint(self, doc_id: str, last_modified: Any):
         self.processed_ids[doc_id] = last_modified
         self.checkpoint_buffer[doc_id] = last_modified
-
     async def _embedding_worker(self):
         batch_size = 16
         wait_timeout = 0.05
@@ -649,7 +512,6 @@ class VectorStore:
                 break
             except Exception as e:
                 logger.error(f"Embedding worker encountered an error: {e}", exc_info=True)
-
     async def _upsert_worker(self):
         batch_size = 32
         wait_timeout = 0.05
@@ -677,12 +539,7 @@ class VectorStore:
                         docs_collection = self.collections.get(coll_name)
                         if not docs_collection:
                             raise Exception(f"集合 {coll_name} 未初始化")
-                        docs_collection.upsert(
-                            ids=ids,
-                            embeddings=embeddings,
-                            documents=documents,
-                            metadatas=metadatas
-                        )
+                        docs_collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
                         for fut in futures:
                             if not fut.done():
                                 fut.set_result(True)
@@ -695,7 +552,6 @@ class VectorStore:
                 break
             except Exception as e:
                 logger.error(f"Upsert worker encountered an error: {e}", exc_info=True)
-
     async def close(self):
         try:
             if self.embedding_worker_task:
@@ -710,11 +566,7 @@ class VectorStore:
                     await self.upsert_worker_task
                 except asyncio.CancelledError:
                     logger.info("Upsert worker task cancelled")
-            resources = [
-                ('database', self.db),
-                ('chroma_client', self.chroma_client),
-                ('executor', self.executor)
-            ]
+            resources = [('database', self.db), ('chroma_client', self.chroma_client), ('executor', self.executor)]
             for name, res in resources:
                 if res is not None:
                     try:
@@ -724,8 +576,8 @@ class VectorStore:
                             self.chroma_client = None
                         logger.info(f"成功關閉 {name}")
                     except Exception as e:
-                        logger.error(f"錯誤：在關閉 {name} 時發生異常：{str(e)}。", exc_info=True)
+                        logger.error(f"錯誤：在關閉 {name} 時發生異常：{str(e)}", exc_info=True)
             logger.info("所有資源清理完成")
         except Exception as e:
-            logger.error(f"錯誤：在清理資源過程中發生異常：{e}。", exc_info=True)
+            logger.error(f"錯誤：在清理資源過程中發生異常：{e}", exc_info=True)
             raise

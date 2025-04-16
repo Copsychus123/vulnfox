@@ -51,14 +51,12 @@ except ImportError as e:
 # 工具函式
 # -----------------------------
 def get_text_from_node(node: Any) -> str:
-    """從節點取得文本"""
     if isinstance(node, NodeWithScore):
         return node.node.text
     return getattr(node, "text", str(node))
 
 @lru_cache(maxsize=100)
 def get_query_embedding(query: str, embed_model: Any) -> List[float]:
-    """獲取查詢的嵌入向量 (使用快取)"""
     try:
         return embed_model.get_query_embedding(query)
     except Exception as e:
@@ -68,19 +66,15 @@ def get_query_embedding(query: str, embed_model: Any) -> List[float]:
 # -----------------------------
 # 增強型重排序器
 # -----------------------------
-class EnhancedReranker:
-    """統一重排序器接口，可組合多種重排序策略"""
-    
+class EnhancedReranker:    
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.rerankers = {}
         self._initialize_rerankers()
         
     def _initialize_rerankers(self):
-        """初始化所有重排序器"""
         top_n = self.config.get('rerank_top_n', 3)
         
-        # 不直接傳遞 llm 參數給 LLMRerank
         self.rerankers = {
             'llm': LLMRerank(
                 choice_batch_size=3, 
@@ -96,25 +90,21 @@ class EnhancedReranker:
         }
     
     def _create_enhanced_rankgpt(self, top_n: int) -> RankGPTRerank:
-        """創建增強版 RankGPT 重排序器"""
         class EnhancedRankGPTRerank(RankGPTRerank):
             def postprocess_nodes(self, nodes, query_bundle):
                 try:
                     valid_nodes = [n for n in nodes if n and hasattr(n, 'metadata')]
                     return super().postprocess_nodes(valid_nodes, query_bundle) if valid_nodes else []
                 except Exception as e:
-                    logger.error(f"RankGPT重排序錯誤: {e}")
                     return nodes
                     
         return EnhancedRankGPTRerank(top_n=top_n)
     
     def get_reranker(self, name: str):
-        """獲取指定名稱的重排序器"""
         return self.rerankers.get(name)
     
     def hybrid_rerank(self, nodes: List[Any], query: Union[str, QueryBundle], 
                       strategies: List[str] = None) -> List[Any]:
-        """組合多種重排序策略"""
         if not nodes:
             return []
             
