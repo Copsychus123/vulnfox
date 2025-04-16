@@ -81,7 +81,7 @@ mongorestore --host 127.0.0.1 --port 27017 --db nvd_db nvd_db
 | Vulnerability Management  | ✅  | ✅ | ✅ |
 | AI Remediation Recommendation  | ✅  | ✅ | ✅ |
 | AI Remediation Scheduling  | ✘ | ✅ | ✅ |
-| AI Aftermath Assessment  | ✘ | ✘ | ✅ |
+| AI Assessment Of Consequences  | ✘ | ✘ | ✅ |
 | Risk Matrix   | ✘ | ✘ | ✅ |
 | Patch Tracking and Logging  | ✘ | ✘ | ✅ |
 | Scripted Automated Patching | ✘  | ✅ | ✘ |
