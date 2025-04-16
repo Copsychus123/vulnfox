@@ -1,10 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Time    : ${DATE} ${TIME}
-# @Author  : otto.tsou
-# @Site    : ${SITE}
-# @File    : ${NAME}.py
-# @Software: ${PRODUCT_NAME}
+# @Author  : Copsychus123
+# @email   : t112c72007@ntut.org.tw
+
+# Copyright (C) 2025 Copsychus123
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
 import os, io, logging, pandas as pd
 from typing import Dict, List, Any, Optional, Callable

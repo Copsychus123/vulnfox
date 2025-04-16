@@ -1,10 +1,14 @@
-"""
-最終版本的向量存儲系統：
-  1. 支持三種初始化模式（initialize、lazy、incremental）
-  2. 結合非同步、快取、斷點輪詢、批次向量生成與批次上傳等技術提升效能
-  3. 完美兼容由原型生成的向量資料庫，並盡可能避免額外向量工作量
-  4. 當指定持久化路徑下無任何集合時，不自動建立新集合以免覆蓋現有資料
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# @Time    : ${DATE} ${TIME}
+# @Author  : Copsychus123
+# @email   : t112c72007@ntut.org.tw
+
+# Copyright (C) 2025 Copsychus123
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
 import os
 import json

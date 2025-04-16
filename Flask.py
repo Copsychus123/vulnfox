@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Time    : ${DATE} ${TIME}
-# @Author  : otto.tsou
+# @Author  : Copsychus123
 # @email   : t112c72007@ntut.org.tw
-# @Site    : ${SITE}
-# @File    : ${NAME}.py
-# @Software: ${PRODUCT_NAME}
+
+# Copyright (C) 2025 Copsychus123
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
 import os, sys, json, datetime, asyncio, logging
 from typing import Dict, Any, List, Optional
