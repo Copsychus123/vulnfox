@@ -8,9 +8,6 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 - **Asset-Based Risk Management**  
    The system performs a systematic review of corporate assets, potential threats, and vulnerabilities. It identifies, assesses, and quantifies the risk matrix while documenting detailed vulnerability information. This supports precise remediation and standardized workflows, thereby reducing overall cybersecurity risk.
 
-- **Lightweight Performance & Low‑Spec Deployment**  
-   By packaging with Docker and streamlining model parameters, memory and compute demands are greatly reduced, allowing large language models to run smoothly on standard, non‑GPU hardware.
-
 - **Multi-Factor Vulnerability Algorithm Assessment**  
    In addition to the traditional CVSS scoring mechanism, the system integrates mechanisms such as EPSS and KEV to evaluate the actual exploitation risk of vulnerabilities. This results in more accurate risk prioritization, enabling a focus on the most critical threats.
 
@@ -25,6 +22,9 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 
 - **Integrated Vulnerability Management Process**  
    From asset inventory and vulnerability information collection to AI analysis, vulnerability ranking, remediation planning, and progress tracking, the system offers a more comprehensive and systematic vulnerability management solution. This helps enterprises respond more effectively to cybersecurity threats, save remediation resources, and promote team collaboration.
+
+- **Lightweight Performance & Low‑Spec Deployment (In the future)**  
+   By packaging with Docker and streamlining model parameters, memory and compute demands are greatly reduced, allowing large language models to run smoothly on standard, non‑GPU hardware.
 
 - **Zero Trust Architecture Integration (In the future)**  
    The system will integrate multiple asset discovery mechanisms such as active scanning, passive monitoring, configuration analysis, and manual analysis to provide a comprehensive oversight of cybersecurity vulnerabilities from an asset management perspective, ensuring continuous and complete asset and vulnerability monitoring.
