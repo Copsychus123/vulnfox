@@ -8,6 +8,9 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 - **Asset-Based Risk Management**  
    The system performs a systematic review of corporate assets, potential threats, and vulnerabilities. It identifies, assesses, and quantifies the risk matrix while documenting detailed vulnerability information. This supports precise remediation and standardized workflows, thereby reducing overall cybersecurity risk.
 
+- **Lightweight Performance & Low‑Spec Deployment**  
+   By packaging with Docker and streamlining model parameters, memory and compute demands are greatly reduced, allowing large language models to run smoothly on standard, non‑GPU hardware.
+
 - **Multi-Factor Vulnerability Algorithm Assessment**  
    In addition to the traditional CVSS scoring mechanism, the system integrates mechanisms such as EPSS and KEV to evaluate the actual exploitation risk of vulnerabilities. This results in more accurate risk prioritization, enabling a focus on the most critical threats.
 
