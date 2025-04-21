@@ -29,7 +29,7 @@ VulnFox is designed to help enterprises quickly gain visibility into their asset
 - **Zero Trust Architecture Integration (In the future)**  
    The system will integrate multiple asset discovery mechanisms such as active scanning, passive monitoring, configuration analysis, and manual analysis to provide a comprehensive oversight of cybersecurity vulnerabilities from an asset management perspective, ensuring continuous and complete asset and vulnerability monitoring.
   
-![photo](https://github.com/Copsychus123/vulnfox/blob/main/asset%20risk%20management.png)
+<img src="https://github.com/Copsychus123/vulnfox/blob/main/main%20functions.png" width="70%" />
 <br><br>
 
 ## Demo Video
